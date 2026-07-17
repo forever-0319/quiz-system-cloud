@@ -7,12 +7,20 @@ const Cloud = (() => {
   async function init(){
     try {
       if(typeof window.supabase === 'undefined' || !window.supabase.createClient){
-        console.warn('Supabase not loaded');
-        updateStatus('error', '❌ Supabase SDK 未加载');
+        console.warn('Supabase SDK 未加载');
+        updateStatus('error', '❌ Supabase SDK 未加载，请检查网络');
         return false;
       }
-      supabase = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
-      const { error } = await supabase.from('matches').select('id').limit(1);
+      supabase = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
+        auth: { persistSession: false }
+      });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Supabase 连接超时（5秒）')), 5000);
+      });
+      const queryPromise = supabase.from('matches').select('id').limit(1);
+
+      const { error } = await Promise.race([queryPromise, timeoutPromise]);
       if(error) throw error;
       connected = true;
       updateStatus('connected', '☁️ 云端已连接');
@@ -20,8 +28,8 @@ const Cloud = (() => {
       return true;
     } catch(err){
       connected = false;
-      console.error('Supabase 连接失败:', err);
-      updateStatus('error', '⚠️ 云端连接失败，将使用本地模式');
+      console.warn('Supabase 未连接:', err.message);
+      updateStatus('error', `⚠️ 云端连接失败（${err.message || '未知错误'}），将使用本地模式`);
       return false;
     }
   }

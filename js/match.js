@@ -170,21 +170,29 @@ const Match = (() => {
     name = name.trim();
     roomId = roomId.trim().toUpperCase();
     inviteCode = inviteCode.trim().toUpperCase();
+    console.log('[validateLogin] 验证:', { name, roomId, inviteCode });
 
     if(isOnline()){
       try {
+        console.log('[validateLogin] 查询云端比赛, roomId=', roomId);
         const m = await window.Cloud.getMatchByRoom(roomId);
-        if(!m) return { ok:false, msg:'该房间号不存在（云端未找到）' };
+        console.log('[validateLogin] 云端返回:', m);
+        if(!m){
+          console.warn('[validateLogin] ❌ 云端无此房间号');
+          return { ok:false, msg:'该房间号不存在（云端未找到）' };
+        }
         const codes = await window.Cloud.listInviteCodes(m.id);
+        console.log('[validateLogin] 邀请码:', codes.map(c => c.code));
         const code = codes.find(c => c.code === inviteCode);
         if(!code) return { ok:false, msg:'邀请码无效' };
         if(m.status === 'finished') return { ok:false, msg:'本场比赛已结束' };
         if(code.used && code.player_name !== name){
           return { ok:false, msg:'该邀请码已被 ' + (code.player_name||'其他选手') + ' 使用' };
         }
+        console.log('[validateLogin] ✅ 验证通过');
         return { ok:true, match: m, code, online:true };
       } catch(err){
-        console.warn('云端验证失败，回落到本地:', err);
+        console.warn('[validateLogin] ❌ 云端查询异常:', err.message);
       }
     }
 

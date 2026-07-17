@@ -561,6 +561,7 @@ const Judge = (() => {
   }
 
   async function createMatchClick(){
+    console.log('[createMatch] 开始');
     const minutes = parseInt($('#jMinutes').value, 10);
     const codeCount = parseInt($('#jInviteCount').value, 10);
     if(!minutes || minutes < 1){ showToast('时长无效', 'err'); return; }
@@ -574,30 +575,43 @@ const Judge = (() => {
     let encryptedBank = null;
     if(isOnline()){
       try {
+        console.log('[createMatch] 1. 加密题库...');
         const encData = await Crypto.encrypt(JSON.stringify(bank), pwd);
+        console.log('[createMatch] 2. 上传加密题库...');
         const saved = await window.Cloud.saveBank(
           bank.modules.length + '题-' + new Date().toLocaleDateString(),
           encData,
           pwd
         );
         encryptedBank = { bankId: saved.id, password: pwd };
-        console.log('题库已上传:', saved.id);
+        console.log('[createMatch] ✅ 题库已上传:', saved.id);
       } catch(err){
+        console.error('[createMatch] ❌ 题库上传失败:', err);
         showToast('❌ 题库上传失败：' + err.message + '（本地继续）', 'err');
       }
     } else {
       encryptedBank = { bankId: null, password: pwd };
+      console.log('[createMatch] 离线模式，跳过云端上传');
     }
 
     try {
+      console.log('[createMatch] 3. 生成邀请码并创建比赛...');
       const codes = [];
       for(let i=0;i<codeCount;i++) codes.push({ code: Match.generateInviteCode() });
       const m = await Match.createMatch(bank, minutes, codeCount, encryptedBank);
       m.encryptedBank = encryptedBank;
       Storage.saveMatch(m);
+      console.log('[createMatch] ✅ 比赛已创建:', {
+        id: m.id,
+        roomId: m.roomId,
+        codes: m.codes.map(c => c.code),
+        codesStored: m.codes.length,
+        bankId: encryptedBank?.bankId
+      });
       showToast(`🎮 比赛已生成（${isOnline()?'同步到云端':''}）`, 'ok');
       refreshMatchUI();
     } catch(e){
+      console.error('[createMatch] ❌ 比赛创建失败:', e);
       showToast('❌ ' + e.message, 'err');
     }
   }

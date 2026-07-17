@@ -117,11 +117,13 @@ const Cloud = (() => {
     return true;
   }
 
-  async function createMatch(bankId, roomId, totalMinutes){
+  async function createMatch(bankId, roomId, totalMinutes, config = null){
     if(!connected) return null;
     const judgeId = getJudgeId();
+    const insertData = { bank_id: bankId, judge_id: judgeId, room_id: roomId, total_minutes: totalMinutes, status: 'pending' };
+    if(config) insertData.config = config;
     const { data, error } = await supabase.from('matches')
-      .insert({ bank_id: bankId, judge_id: judgeId, room_id: roomId, total_minutes: totalMinutes, status: 'pending' })
+      .insert(insertData)
       .select()
       .single();
     if(error) throw error;
@@ -129,6 +131,7 @@ const Cloud = (() => {
   }
 
   async function updateMatch(id, updates){
+    if(!connected) return null;
     const { data, error } = await supabase.from('matches')
       .update(updates)
       .eq('id', id)

@@ -28,7 +28,7 @@ const Match = (() => {
     if(isOnline()){
       try {
         const bankId = encryptedBank.bankId;
-        const matchData = await window.Cloud.createMatch(bankId, roomId, totalMinutes);
+        const matchData = await window.Cloud.createMatch(bankId, roomId, totalMinutes, encryptedBank);
         const codesData = await window.Cloud.addInviteCodes(matchData.id, codes.map(c => c.code));
         const m = {
           id: matchData.id,

@@ -755,6 +755,11 @@ const App = (() => {
       if(v.online && v.match.id){
         try {
           const dbMatch = await window.Cloud.getMatch(v.match.id);
+          const cloudConfig = dbMatch.config || {};
+          const encryptedBankFromCloud = {
+            bankId: dbMatch.bank_id || cloudConfig.bankId,
+            password: cloudConfig.password || encryptedBank?.password
+          };
           match = {
             id: dbMatch.id,
             roomId: dbMatch.room_id,
@@ -764,8 +769,9 @@ const App = (() => {
             expiresAt: dbMatch.expires_at ? new Date(dbMatch.expires_at).getTime() : null,
             finishedAt: dbMatch.finished_at ? new Date(dbMatch.finished_at).getTime() : null,
             createdAt: new Date(dbMatch.created_at).getTime(),
-            encryptedBank
+            encryptedBank: encryptedBankFromCloud
           };
+          const encryptedBank = match.encryptedBank;
           if(encryptedBank && encryptedBank.bankId){
             const cloudBank = await window.Cloud.getBank(encryptedBank.bankId);
             if(cloudBank && cloudBank.encrypted_data){

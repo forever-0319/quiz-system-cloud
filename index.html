@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>司法鉴定能力挑战</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">📚 司法鉴定能力挑战</div>
+  <div id="userInfo" class="user-info"></div>
+  <button id="logoutBtn" class="logout-btn hidden">退出</button>
+  <div id="timer" class="timer hidden">⏱ --:--</div>
+</header>
+
+<main id="app">
+
+  <!-- 首页 -->
+  <section id="view-home" class="view active">
+    <div class="hero">
+      <h1>司法鉴定能力挑战</h1>
+      <p class="muted">8 个专业方向 · 触发式解锁 · 云端多设备同步</p>
+    </div>
+    <div class="card center">
+      <h2>请选择身份</h2>
+      <div class="role-grid">
+        <button class="role-btn" data-role="player">
+          <div class="role-icon">👤</div>
+          <div class="role-name">选手入口</div>
+          <div class="role-desc">需邀请码 + 房间号</div>
+        </button>
+        <button class="role-btn" data-role="judge">
+          <div class="role-icon">👨‍⚖️</div>
+          <div class="role-name">裁判入口</div>
+          <div class="role-desc">配置题库 · 生成邀请码</div>
+        </button>
+      </div>
+    </div>
+    <div id="cloudStatus" class="cloud-status muted">☁️ 正在连接云端...</div>
+  </section>
+
+  <!-- 选手登录 -->
+  <section id="view-login" class="view">
+    <div class="card">
+      <button class="btn ghost small" data-view="home">← 返回</button>
+      <h2>选手登录</h2>
+      <div id="loginMatchStatus" class="match-status-box"></div>
+      <div class="form">
+        <label>姓名：<input type="text" id="loginName" placeholder="请输入您的姓名"></label>
+        <label>房间号：<input type="text" id="loginRoom" placeholder="裁判告诉您的房间号" autocapitalize="characters" style="text-transform:uppercase"></label>
+        <label>邀请码：<input type="text" id="loginInvite" placeholder="邀请码" autocapitalize="characters" style="text-transform:uppercase"></label>
+        <button id="loginSubmit" class="btn primary">登录</button>
+      </div>
+      <div id="loginStatus" class="status muted"></div>
+      <div class="row mt-10" style="border-top:1px dashed var(--border);padding-top:12px">
+        <button id="loginImportMatch" class="btn ghost small">📥 导入比赛包</button>
+        <input type="file" id="loginMatchFile" accept=".json" hidden>
+        <span class="muted small">跨设备/浏览器时使用</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 裁判登录/注册 -->
+  <section id="view-judge-auth" class="view">
+    <div class="card">
+      <button class="btn ghost small" data-view="home">← 返回</button>
+      <div id="judgeAuthFirst">
+        <h2>首次使用：设置裁判密码</h2>
+        <p class="muted">该密码用于登录裁判端，请妥善保管</p>
+        <div class="form">
+          <label>新密码：<input type="password" id="judgePwd1"></label>
+          <label>确认密码：<input type="password" id="judgePwd2"></label>
+          <button id="judgeSetupBtn" class="btn primary">设置并进入</button>
+        </div>
+      </div>
+      <div id="judgeAuthLogin" class="hidden">
+        <h2>裁判登录</h2>
+        <div class="form">
+          <label>密码：<input type="password" id="judgePwdLogin"></label>
+          <button id="judgeLoginBtn" class="btn primary">进入控制台</button>
+          <button id="judgeResetBtn" class="btn ghost small">忘记密码？重置裁判账号</button>
+        </div>
+      </div>
+      <div id="judgeAuthStatus" class="status muted"></div>
+    </div>
+  </section>
+
+  <!-- 裁判控制台 -->
+  <section id="view-judge" class="view">
+    <!-- 第 1 步：题库加载 -->
+    <div class="card">
+      <h2>① 题库加载</h2>
+      <div class="row">
+        <button id="jLoadExcel" class="btn primary small">📁 加载 Excel 题库</button>
+        <button id="jLoadEnc" class="btn ghost small">🔐 加载加密题库</button>
+        <button id="jLoadDemo" class="btn ghost small">🎯 加载示例</button>
+      </div>
+      <input type="file" id="jFileExcel" accept=".xlsx,.xls" hidden>
+      <input type="file" id="jFileEnc" accept=".json" hidden>
+      <div id="jBankStatus" class="status muted mt-10">题库未加载</div>
+    </div>
+
+    <!-- 第 2 步：时长配置 -->
+    <div class="card">
+      <h2>② 考试时长</h2>
+      <div class="form">
+        <label>时长（分钟）：
+          <input type="number" id="jMinutes" value="120" min="1" max="600">
+        </label>
+        <p class="muted small">时间到后所有选手自动交卷，硬关闭</p>
+      </div>
+    </div>
+
+    <!-- 第 3 步：比赛配置 -->
+    <div class="card">
+      <h2>③ 比赛配置</h2>
+      <div id="jMatchPending">
+        <div class="form">
+          <label>生成邀请码数量：
+            <input type="number" id="jInviteCount" value="5" min="1" max="100">
+          </label>
+          <button id="jCreateMatch" class="btn primary">🎮 生成比赛（房间号+邀请码）</button>
+        </div>
+      </div>
+      <div id="jMatchCreated" class="hidden">
+        <div class="match-info">
+          <div class="info-row">
+            <span class="label">房间号：</span>
+            <code id="jRoomId" class="big-code"></code>
+            <button class="btn ghost small" id="jCopyRoom">复制</button>
+          </div>
+          <h3>邀请码列表（<span id="jCodeTotal">0</span> 个，已用 <span id="jCodeUsed">0</span>）</h3>
+          <div id="jCodeList" class="code-list"></div>
+          <button id="jCopyAllCodes" class="btn ghost small mt-10">📋 复制全部邀请码</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第 4 步：比赛控制 -->
+    <div class="card">
+      <h2>④ 比赛控制</h2>
+      <div id="jMatchControl">
+        <div class="muted">尚未生成比赛</div>
+      </div>
+    </div>
+
+    <!-- 第 5 步：选手列表 -->
+    <div class="card">
+      <div class="row between">
+        <h2>⑤ 选手进度（<span id="jPlayerCount">0</span>）</h2>
+        <div class="row">
+          <label class="row small" style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="jAutoRefresh" checked>
+            <span class="muted small">自动刷新</span>
+          </label>
+          <label class="row small" style="display:flex;align-items:center;gap:6px">
+            <span class="muted small">排序：</span>
+            <select id="jSortBy">
+              <option value="progress">按进度</option>
+              <option value="time">按登录时间</option>
+              <option value="name">按姓名</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div id="jPlayerList" class="muted">暂无选手登录</div>
+    </div>
+
+    <!-- 第 6 步：操作 -->
+    <div class="card">
+      <h2>⑥ 操作</h2>
+      <div class="row">
+        <button id="jExportMatch" class="btn primary">📦 导出比赛包</button>
+        <button id="jExportStats" class="btn ghost">⬇ 导出当前比赛报告</button>
+        <button id="jForceEndAll" class="btn danger">⏹ 一键交卷所有选手</button>
+        <button class="btn ghost" data-view="home">返回首页</button>
+      </div>
+    </div>
+
+    <!-- 第 7 步：历史比赛 -->
+    <div class="card">
+      <div class="row between">
+        <h2>⑦ 历史比赛（<span id="jArchiveCount">0</span>）</h2>
+        <button id="jClearArchives" class="btn ghost small">🗑 清空全部</button>
+      </div>
+      <div id="jArchiveList" class="muted">暂无历史比赛</div>
+    </div>
+  </section>
+
+  <!-- 历史比赛详情 -->
+  <section id="view-archive-detail" class="view">
+    <div class="card">
+      <div class="row between">
+        <button id="archiveBack" class="btn ghost small">← 返回</button>
+        <h2 id="archiveTitle"></h2>
+        <div class="row">
+          <button id="archiveReopen" class="btn primary small">🔄 重新打开</button>
+          <button id="archiveExport" class="btn ghost small">⬇ 导出 CSV</button>
+          <button id="archiveDelete" class="btn danger small">🗑 删除</button>
+        </div>
+      </div>
+      <div id="archiveSummary" class="summary"></div>
+      <h3>参赛选手（<span id="archivePlayers">0</span>）</h3>
+      <div id="archivePlayerTable"></div>
+    </div>
+  </section>
+
+  <!-- 选手详情弹窗 -->
+  <div id="playerModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="playerModalTitle">选手详情</h2>
+        <button class="btn ghost small" id="playerModalClose">✕ 关闭</button>
+      </div>
+      <div id="playerModalBody"></div>
+      <div class="modal-footer">
+        <button id="playerForceSubmit" class="btn danger">⏹ 强制交卷</button>
+        <button id="playerReset" class="btn ghost">🗑 重置进度</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 选手 dashboard（保留第1期代码） -->
+  <section id="view-dashboard" class="view">
+    <div class="card">
+      <div class="row between">
+        <h2>专业模块</h2>
+        <div class="muted">已触发 <b id="totalUnlocked">0</b> 题，已答 <b id="totalAnswered">0</b> 题</div>
+      </div>
+      <div id="moduleGrid" class="module-grid"></div>
+      <div id="dashboardFallback" class="muted small mt-10 hidden"></div>
+    </div>
+    <div class="card">
+      <button id="finishBtn" class="btn danger">✅ 完成答题</button>
+      <p class="muted small mt-10">点击后系统会统一判分，显示正确答案和分数</p>
+    </div>
+  </section>
+
+  <section id="view-module" class="view">
+    <div class="card">
+      <div class="row between">
+        <button class="btn ghost small" data-go="dashboard">← 返回</button>
+        <h2 id="moduleTitle"></h2>
+        <div class="muted">已触发 <b id="modUnlocked">0</b> 题，已答 <b id="modAnswered">0</b> 题</div>
+      </div>
+      <div id="questionList" class="qlist"></div>
+    </div>
+  </section>
+
+  <section id="view-quiz" class="view">
+    <div class="quiz-header">
+      <button class="btn ghost small" id="backToModule">← 返回模块</button>
+      <div>
+        <span class="qtype" id="quizType"></span>
+        <span class="qid muted" id="quizId"></span>
+      </div>
+    </div>
+    <div class="card">
+      <div id="quizStem" class="stem"></div>
+      <div id="quizImage" class="quiz-image hidden"></div>
+      <div id="quizOptions" class="options"></div>
+      <div id="quizFill" class="fill-input hidden">
+        <input type="text" id="fillInput" placeholder="请输入答案">
+      </div>
+      <div id="quizStatus" class="quiz-status"></div>
+      <div class="row between mt-16">
+        <button id="quizPrev" class="btn ghost">上一题</button>
+        <div class="row">
+          <button id="quizSave" class="btn">💾 保存草稿</button>
+          <button id="quizSubmit" class="btn primary">✅ 提交答案</button>
+        </div>
+        <button id="quizNext" class="btn ghost">下一题 →</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-result" class="view">
+    <div class="card">
+      <h2>🎉 答题完成</h2>
+      <div id="resultSummary" class="result-summary"></div>
+      <div id="resultDetail" class="qlist"></div>
+      <div class="row mt-16">
+        <button id="viewWrongBtn" class="btn danger">❌ 查看错题本</button>
+        <button class="btn ghost" data-go="dashboard">返回主页</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-wrong" class="view">
+    <div class="card">
+      <div class="row between">
+        <button class="btn ghost small" data-go="result">← 返回结果</button>
+        <h2>错题本（<span id="wrongCount">0</span>）</h2>
+      </div>
+      <div id="wrongList" class="qlist muted">暂无错题</div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="muted">司法鉴定能力挑战系统 · v1.1</footer>
+
+<script src="lib/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="lib/xlsx.full.min.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/excel-parser.js"></script>
+<script src="js/crypto.js"></script>
+<script src="js/trigger-engine.js"></script>
+<script src="js/match.js"></script>
+<script src="js/realtime.js"></script>
+<script src="js/cloud.js"></script>
+<script src="js/judge.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

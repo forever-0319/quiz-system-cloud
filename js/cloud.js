@@ -4,33 +4,55 @@ const Cloud = (() => {
   const listeners = new Map();
   const channels = new Map();
 
+  let _initStarted = false;
   async function init(){
-    try {
-      if(typeof window.supabase === 'undefined' || !window.supabase.createClient){
-        console.warn('Supabase SDK 未加载');
-        updateStatus('error', '❌ Supabase SDK 未加载，请检查网络');
-        return false;
+    if(_initStarted){
+      return connected;
+    }
+    _initStarted = true;
+    updateStatus('checking', '☁️ 正在连接云端...');
+
+    let forceErrMsg = null;
+    const forceTimer = setTimeout(() => {
+      if(!connected && !forceErrMsg){
+        forceErrMsg = '连接超时（6秒）';
+        updateStatus('error', `⚠️ 云端${forceErrMsg}，已自动切到本地模式`);
       }
+    }, 6000);
+
+    try {
+      console.log('[Cloud.init] 检查 SDK...');
+      if(typeof window.supabase === 'undefined'){
+        throw new Error('Supabase SDK 未加载（window.supabase 不存在）');
+      }
+      if(!window.supabase.createClient){
+        throw new Error('Supabase SDK 不完整（无 createClient）');
+      }
+      console.log('[Cloud.init] 创建客户端...');
       supabase = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
         auth: { persistSession: false }
       });
 
+      console.log('[Cloud.init] 测试连接...');
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Supabase 连接超时（5秒）')), 5000);
+        setTimeout(() => reject(new Error('连接超时（5秒）')), 5000);
       });
       const queryPromise = supabase.from('matches').select('id').limit(1);
 
       const { error } = await Promise.race([queryPromise, timeoutPromise]);
-      if(error) throw error;
+      if(error) throw new Error('查询失败: ' + (error.message || JSON.stringify(error)));
       connected = true;
+      console.log('[Cloud.init] ✅ 已连接');
       updateStatus('connected', '☁️ 云端已连接');
-      console.log('Supabase 已连接');
       return true;
     } catch(err){
       connected = false;
-      console.warn('Supabase 未连接:', err.message);
-      updateStatus('error', `⚠️ 云端连接失败（${err.message || '未知错误'}），将使用本地模式`);
+      console.warn('[Cloud.init] ❌ 失败:', err.message);
+      const msg = forceErrMsg || err.message || '未知错误';
+      updateStatus('error', `⚠️ 云端连接失败（${msg}），将使用本地模式`);
       return false;
+    } finally {
+      clearTimeout(forceTimer);
     }
   }
 
@@ -286,3 +308,11 @@ const Cloud = (() => {
     subscribeMatch
   };
 })();
+
+// 脚本加载后立即启动初始化，不依赖其他脚本
+setTimeout(() => {
+  if(typeof window !== 'undefined' && window.Cloud){
+    console.log('[auto] 启动云端初始化...');
+    window.Cloud.init();
+  }
+}, 100);

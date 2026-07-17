@@ -1,3 +1,5 @@
+console.log('[cloud.js] 脚本开始加载');
+
 const Cloud = (() => {
   let supabase = null;
   let connected = false;
@@ -309,15 +311,22 @@ const Cloud = (() => {
   };
 })();
 
-// 暴露到全局（因为 const 不会自动挂到 window）
+console.log('[cloud.js] IIFE 完成，Cloud 定义:', typeof Cloud);
+
 if(typeof window !== 'undefined'){
   window.Cloud = Cloud;
+  console.log('[cloud.js] 挂到 window.Cloud:', typeof window.Cloud);
 }
+
+console.log('[cloud.js] 注册 setTimeout...');
 
 // 脚本加载后立即启动初始化
 setTimeout(() => {
+  console.log('[cloud.js] setTimeout 触发');
   if(typeof window !== 'undefined' && window.Cloud){
     console.log('[auto] 启动云端初始化...');
     window.Cloud.init();
+  } else {
+    console.error('[cloud.js] window 或 window.Cloud 不存在!');
   }
 }, 100);

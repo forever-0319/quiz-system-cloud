@@ -6,7 +6,13 @@ const Crypto = (() => {
     return out;
   }
 
-  async function importPbkdf2Key(password, salt){
+  function bytesToB64(bytes){
+    let bin = '';
+    for(let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+
+  async function deriveKey(password, salt){
     const enc = new TextEncoder();
     const baseKey = await crypto.subtle.importKey(
       'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
@@ -16,8 +22,33 @@ const Crypto = (() => {
       baseKey,
       {name:'AES-GCM', length:256},
       false,
-      ['decrypt']
+      ['encrypt', 'decrypt']
     );
+  }
+
+  async function encrypt(plaintext, password){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    const enc = new TextEncoder();
+    const ciphertext = await crypto.subtle.encrypt(
+      {name:'AES-GCM', iv, tagLength: 128},
+      key,
+      enc.encode(plaintext)
+    );
+    const ctLen = ciphertext.byteLength - 16;
+    const data = new Uint8Array(ciphertext, 0, ctLen);
+    const tag = new Uint8Array(ciphertext, ctLen, 16);
+    return {
+      v: 1,
+      algo: 'AES-GCM',
+      kdf: 'PBKDF2-SHA256',
+      iter: 100000,
+      salt: bytesToB64(salt),
+      iv: bytesToB64(iv),
+      tag: bytesToB64(tag),
+      data: bytesToB64(data)
+    };
   }
 
   async function decrypt(encObj, password){
@@ -32,10 +63,10 @@ const Crypto = (() => {
     ciphertext.set(data, 0);
     ciphertext.set(tag, data.length);
 
-    const key = await importPbkdf2Key(password, salt);
+    const key = await deriveKey(password, salt);
     try {
       const plain = await crypto.subtle.decrypt(
-        {name:'AES-GCM', iv, tagLength:128},
+        {name:'AES-GCM', iv, tagLength: 128},
         key,
         ciphertext
       );
@@ -51,11 +82,8 @@ const Crypto = (() => {
     const encObj = await resp.json();
     const bank = await decrypt(encObj, password);
     if(!bank.modules || !bank.questions) throw new Error('加密数据格式错误');
-    bank.questions.forEach((q,i)=>{
-      q.id = q.id || ('q_' + (i+1));
-    });
     return bank;
   }
 
-  return { decrypt, loadEncryptedBank };
+  return { encrypt, decrypt, loadEncryptedBank };
 })();

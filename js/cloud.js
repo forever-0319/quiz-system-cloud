@@ -309,7 +309,12 @@ const Cloud = (() => {
   };
 })();
 
-// 脚本加载后立即启动初始化，不依赖其他脚本
+// 暴露到全局（因为 const 不会自动挂到 window）
+if(typeof window !== 'undefined'){
+  window.Cloud = Cloud;
+}
+
+// 脚本加载后立即启动初始化
 setTimeout(() => {
   if(typeof window !== 'undefined' && window.Cloud){
     console.log('[auto] 启动云端初始化...');

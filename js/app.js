@@ -582,14 +582,58 @@ const App = (() => {
 
     if(progress.finished){
       renderResult();
-    } else if(match.status === 'running'){
-      startTimer(match.expiresAt);
-      renderDashboard();
-    } else if(match.status === 'finished'){
-      renderResult();
-    } else {
-      renderDashboard();
+      return;
     }
+    if(match.status === 'pending'){
+      showWaitingForStart();
+      subscribeToMatch(match.id);
+      return;
+    }
+    if(match.status === 'finished'){
+      renderResult();
+      return;
+    }
+    startTimer(match.expiresAt);
+    renderDashboard();
+    subscribeToMatch(match.id);
+  }
+
+  function showWaitingForStart(){
+    const m = Storage.getMatch();
+    const p = Storage.getPlayer();
+    $('#waitingRoomId').textContent = m.roomId;
+    $('#waitingName').textContent = p.name;
+    $('#waitingMinutes').textContent = m.totalMinutes;
+    showView('waiting');
+  }
+
+  function subscribeToMatch(matchId){
+    if(!window.Cloud || !window.Cloud.isConnected() || !matchId) return;
+    try {
+      if(window._currentSub && window._currentSub.id === matchId) return;
+      if(window._currentSub && window._currentSub.unsubscribe){
+        window._currentSub.unsubscribe();
+      }
+      window._currentSub = {
+        id: matchId,
+        unsubscribe: window.Cloud.subscribeMatch(matchId, msg => {
+          if(msg.type === 'answer' || msg.type === 'progress'){
+            window.Cloud.getMatch(matchId).then(dbMatch => {
+              if(!dbMatch) return;
+              const localMatch = Storage.getMatch();
+              localMatch.status = dbMatch.status;
+              if(dbMatch.expires_at) localMatch.expiresAt = new Date(dbMatch.expires_at).getTime();
+              if(dbMatch.started_at) localMatch.startedAt = new Date(dbMatch.started_at).getTime();
+              Storage.saveMatch(localMatch);
+              if(dbMatch.status === 'running' && state.progress && !state.progress.finished){
+                startTimer(localMatch.expiresAt);
+                renderDashboard();
+              }
+            });
+          }
+        })
+      };
+    } catch(err){ console.warn('订阅比赛状态失败:', err); }
   }
 
   function refreshLoginMatchStatus(){
@@ -702,6 +746,21 @@ const App = (() => {
           refreshUserInfo();
           showView('home');
           showToast('裁判已重置你的进度', 'err');
+        }
+      } else if(data.type === 'unlockAll'){
+        if(state.playerKey === data.key && state.bank){
+          const m = Storage.getMatch();
+          if(m && m.bankSnapshot){
+            state.progress.unlockedModules = m.bankSnapshot.modules.map(mm => mm.id);
+            state.progress.unlockedQuestions = m.bankSnapshot.questions.map(q => q.id);
+            Storage.saveProgress(state.playerKey, state.progress);
+            if(state.currentModule){
+              renderModule(state.currentModule);
+            } else {
+              renderDashboard();
+            }
+            showToast('🔓 裁判已为你解锁全部模块', 'ok');
+          }
         }
       }
     });
@@ -844,7 +903,12 @@ const App = (() => {
         startTimer(match.expiresAt);
       }
       if(Judge && Judge.refreshPlayerList) Judge.refreshPlayerList();
-      renderDashboard();
+      if(match.status === 'pending'){
+        showWaitingForStart();
+        subscribeToMatch(match.id);
+      } else {
+        renderDashboard();
+      }
     });
 
     $('#finishBtn').addEventListener('click', finishExam);

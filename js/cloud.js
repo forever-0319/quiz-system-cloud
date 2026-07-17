@@ -202,6 +202,20 @@ const Cloud = (() => {
     return data;
   }
 
+  async function setPlayerUnlocked(matchId, playerName, inviteCode, unlockedModules, unlockedQuestions){
+    if(!connected) return null;
+    const { data, error } = await supabase.from('player_progress').upsert({
+      match_id: matchId,
+      player_name: playerName,
+      invite_code: inviteCode,
+      unlocked_modules: unlockedModules || [],
+      unlocked_questions: unlockedQuestions || [],
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'match_id,player_name,invite_code' });
+    if(error) throw error;
+    return data;
+  }
+
   async function getProgress(matchId, playerName, inviteCode){
     const { data, error } = await supabase.from('player_progress')
       .select('*')
@@ -307,7 +321,7 @@ const Cloud = (() => {
     saveBank, listBanks, getBank, deleteBank,
     createMatch, updateMatch, getMatch, getMatchByRoom,
     addInviteCodes, listInviteCodes, markCodeUsed,
-    upsertProgress, getProgress, listMatchProgress,
+    upsertProgress, getProgress, listMatchProgress, setPlayerUnlocked,
     upsertAnswer, listAnswers, listAllMatchAnswers,
     upsertResult, listResults,
     subscribeMatch

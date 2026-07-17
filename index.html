@@ -144,6 +144,10 @@
       <div id="jMatchControl">
         <div class="muted">尚未生成比赛</div>
       </div>
+      <div class="row mt-10" style="border-top:1px dashed var(--border);padding-top:12px">
+        <button id="jCreateMatchQuick" class="btn primary">🆕 一键创建房间</button>
+        <span class="muted small">用当前设置立即创建比赛（如未填设置，使用默认 60 分钟/3 个邀请码）</span>
+      </div>
     </div>
 
     <!-- 第 5 步：选手列表 -->
@@ -218,9 +222,34 @@
       <div class="modal-footer">
         <button id="playerForceSubmit" class="btn danger">⏹ 强制交卷</button>
         <button id="playerReset" class="btn ghost">🗑 重置进度</button>
+        <button id="playerUnlockAll" class="btn primary">🔓 解锁全部模块</button>
       </div>
     </div>
   </div>
+
+  <!-- 选手等待比赛开始 -->
+  <section id="view-waiting" class="view">
+    <div class="card center">
+      <div style="font-size:64px;margin:30px 0 10px">⏳</div>
+      <h2>等待比赛开始</h2>
+      <p class="muted">比赛尚未开始，请耐心等待裁判点击「开始比赛」。</p>
+      <div class="match-info" style="margin-top:20px">
+        <div class="info-row">
+          <span class="label">房间号：</span>
+          <code id="waitingRoomId" style="font-weight:600"></code>
+        </div>
+        <div class="info-row">
+          <span class="label">姓名：</span>
+          <code id="waitingName" style="font-weight:600"></code>
+        </div>
+        <div class="info-row">
+          <span class="label">考试时长：</span>
+          <code id="waitingMinutes" style="font-weight:600"></code> 分钟
+        </div>
+        <p class="muted small mt-10">💡 状态变化时本页会自动刷新，无需手动操作。</p>
+      </div>
+    </div>
+  </section>
 
   <!-- 选手 dashboard（保留第1期代码） -->
   <section id="view-dashboard" class="view">

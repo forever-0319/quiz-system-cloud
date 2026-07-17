@@ -97,7 +97,7 @@ const Judge = (() => {
 
     if(m.status === 'pending'){
       control.innerHTML = `
-        <p class="muted">比赛已生成，房间号和邀请码见上方。</p>
+        <p class="muted">比赛已生成，房间号和邀请码见上方。选手已登录但还没开始答题。</p>
         <button id="jStartMatch" class="btn primary">▶ 开始比赛（启动计时）</button>
         <button id="jDiscardMatch" class="btn ghost">🗑 放弃本次比赛</button>
       `;
@@ -115,14 +115,8 @@ const Judge = (() => {
     } else if(m.status === 'finished'){
       control.innerHTML = `
         <p>状态：<b>已结束</b></p>
-        <button id="jNewMatch" class="btn primary">🔄 创建新比赛</button>
+        <p class="muted small">${m.finishedAt ? '结束时间：' + new Date(m.finishedAt).toLocaleString() : ''}</p>
       `;
-      $('#jNewMatch')?.addEventListener('click', () => {
-        Storage.clearMatch();
-        Storage.clearPlayer();
-        if(realtimeUnsub){ realtimeUnsub(); realtimeUnsub = null; }
-        refreshMatchUI();
-      });
       refreshPlayerList();
     }
   }
@@ -399,6 +393,91 @@ const Judge = (() => {
     refreshPlayerList();
   }
 
+  async function unlockAllForPlayer(){
+    if(!currentDetailCode){ showToast('请先选择选手', 'err'); return; }
+    if(!confirm('为该选手解锁全部模块？\n所有题目立即可见，判分按题库答案。')) return;
+    const m = Storage.getMatch();
+    if(!m || !m.bankSnapshot){ showToast('比赛或题库不存在', 'err'); return; }
+    const cd = m.codes.find(c => c.code === currentDetailCode);
+    if(!cd || !cd.playerName){ showToast('选手未登录', 'err'); return; }
+
+    const allModuleIds = m.bankSnapshot.modules.map(mm => mm.id);
+    const allQuestionIds = m.bankSnapshot.questions.map(q => q.id);
+
+    if(isOnline() && m.id){
+      try {
+        await window.Cloud.setPlayerUnlocked(m.id, cd.playerName, cd.code, allModuleIds, allQuestionIds);
+      } catch(err){
+        showToast('❌ 云端解锁失败：' + err.message, 'err');
+        return;
+      }
+    }
+
+    const playerKey = m.roomId + '_' + currentDetailCode;
+    let progress = Storage.getProgress(playerKey);
+    if(!progress){
+      progress = { unlockedModules:[], unlockedQuestions:[], answers:{}, submittedCount:0, correctCount:0 };
+    }
+    progress.unlockedModules = allModuleIds;
+    progress.unlockedQuestions = allQuestionIds;
+    Storage.saveProgress(playerKey, progress);
+    Realtime.emit('judge:action', { type: 'unlockAll', key: playerKey });
+    showToast('✅ 已解锁全部模块', 'ok');
+    hidePlayerDetail();
+    refreshPlayerList();
+  }
+
+  async function createMatchQuick(){
+    console.log('[createMatchQuick] 开始');
+    const bank = Storage.getBank();
+    if(!bank){ showToast('请先加载题库', 'err'); return; }
+
+    if(!confirm('一键创建房间？\n当前比赛将被归档。')) return;
+
+    const cur = Storage.getMatch();
+    if(cur){
+      try { Match.archiveMatch(cur, 'abandoned'); } catch(e){ console.warn('归档失败', e); }
+    }
+    Storage.clearMatch();
+    Storage.clearPlayer();
+    if(realtimeUnsub){ realtimeUnsub(); realtimeUnsub = null; }
+    if(window._currentSub){ try { window._currentSub.unsubscribe?.(); } catch(e){} window._currentSub = null; }
+
+    const minutes = parseInt($('#jMinutes').value, 10) || 60;
+    const codeCount = parseInt($('#jInviteCount').value, 10) || 3;
+    const pwd = prompt('请设置题库密码（至少 4 位）：', '');
+    if(!pwd || pwd.length < 4){ showToast('密码无效', 'err'); return; }
+
+    let encryptedBank = null;
+    if(isOnline()){
+      try {
+        const encData = await Crypto.encrypt(JSON.stringify(bank), pwd);
+        const saved = await window.Cloud.saveBank(
+          bank.modules.length + '题-' + new Date().toLocaleDateString(),
+          encData, pwd
+        );
+        encryptedBank = { bankId: saved.id, password: pwd };
+      } catch(err){
+        showToast('❌ 题库上传失败：' + err.message, 'err');
+        return;
+      }
+    } else {
+      encryptedBank = { bankId: null, password: pwd };
+    }
+
+    try {
+      const codes = [];
+      for(let i=0;i<codeCount;i++) codes.push({ code: Match.generateInviteCode() });
+      const m = await Match.createMatch(bank, minutes, codeCount, encryptedBank);
+      m.encryptedBank = encryptedBank;
+      Storage.saveMatch(m);
+      showToast(`🆕 房间已创建：${m.roomId}`, 'ok');
+      refreshMatchUI();
+    } catch(e){
+      showToast('❌ ' + e.message, 'err');
+    }
+  }
+
   async function setupJudge(){
     const p1 = $('#judgePwd1').value;
     const p2 = $('#judgePwd2').value;
@@ -616,6 +695,63 @@ const Judge = (() => {
     }
   }
 
+  async function createMatchQuick(){
+    console.log('[createMatchQuick] 开始');
+    const bank = Storage.getBank();
+    if(!bank){ showToast('请先加载题库', 'err'); return; }
+
+    if(!confirm('一键创建房间？\n当前进行中比赛将归档。')) return;
+
+    const cur = Storage.getMatch();
+    if(cur){
+      try {
+        Match.archiveMatch(cur, 'abandoned');
+      } catch(e){ console.warn('归档失败', e); }
+    }
+    Storage.clearMatch();
+    Storage.clearPlayer();
+    if(realtimeUnsub){ realtimeUnsub(); realtimeUnsub = null; }
+    if(window._currentSub){ try { window._currentSub.unsubscribe?.(); } catch(e){} window._currentSub = null; }
+
+    const minutes = parseInt($('#jMinutes').value, 10) || 60;
+    const codeCount = parseInt($('#jInviteCount').value, 10) || 3;
+    const pwd = prompt('请设置题库密码（选手访问时要输入此密码才能加载题库，至少4位）：', '');
+    if(!pwd || pwd.length < 4){ showToast('密码无效', 'err'); return; }
+
+    let encryptedBank = null;
+    if(isOnline()){
+      try {
+        const encData = await Crypto.encrypt(JSON.stringify(bank), pwd);
+        const saved = await window.Cloud.saveBank(
+          bank.modules.length + '题-' + new Date().toLocaleDateString(),
+          encData, pwd
+        );
+        encryptedBank = { bankId: saved.id, password: pwd };
+        console.log('[createMatchQuick] 题库已上传:', saved.id);
+      } catch(err){
+        console.error('[createMatchQuick] ❌ 题库上传失败:', err);
+        showToast('❌ 题库上传失败：' + err.message, 'err');
+        return;
+      }
+    } else {
+      encryptedBank = { bankId: null, password: pwd };
+    }
+
+    try {
+      const codes = [];
+      for(let i=0;i<codeCount;i++) codes.push({ code: Match.generateInviteCode() });
+      const m = await Match.createMatch(bank, minutes, codeCount, encryptedBank);
+      m.encryptedBank = encryptedBank;
+      Storage.saveMatch(m);
+      console.log('[createMatchQuick] ✅ 房间已创建:', { id: m.id, roomId: m.roomId, codes: m.codes.length });
+      showToast(`🆕 房间已创建：${m.roomId}`, 'ok');
+      refreshMatchUI();
+    } catch(e){
+      console.error('[createMatchQuick] ❌ 创建失败:', e);
+      showToast('❌ ' + e.message, 'err');
+    }
+  }
+
   function init(){
     Realtime.init();
     Realtime.on('cloud:answer', () => { refreshPlayerList(); });
@@ -659,6 +795,7 @@ const Judge = (() => {
     });
 
     $('#jCreateMatch').addEventListener('click', createMatchClick);
+    $('#jCreateMatchQuick')?.addEventListener('click', createMatchQuick);
     $('#jCopyRoom').addEventListener('click', () => {
       const rid = $('#jRoomId').textContent;
       if(rid) copyText(rid);
@@ -674,6 +811,8 @@ const Judge = (() => {
 
     $('#playerModalClose').addEventListener('click', hidePlayerDetail);
     $('#playerForceSubmit').addEventListener('click', forceSubmitPlayer);
+    $('#playerReset')?.addEventListener('click', resetPlayer);
+    $('#playerUnlockAll')?.addEventListener('click', unlockAllForPlayer);
 
     refreshBankStatus();
     refreshMatchUI();

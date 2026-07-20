@@ -209,12 +209,14 @@ const Match = (() => {
   }
 
   async function useCode(roomId, inviteCode, playerName){
+    roomId = roomId.toUpperCase();
     inviteCode = inviteCode.toUpperCase();
     if(isOnline()){
       try {
-        const m = await window.Cloud.getMatchByRoom(roomId.toUpperCase());
-        if(m){
-          await window.Cloud.markCodeUsed(m.id, inviteCode, playerName);
+        const dbMatch = await window.Cloud.getMatchByRoom(roomId);
+        if(dbMatch){
+          await window.Cloud.markCodeUsed(dbMatch.id, inviteCode, playerName);
+          return true;
         }
       } catch(err){ console.warn('云端使用邀请码失败:', err); }
     }

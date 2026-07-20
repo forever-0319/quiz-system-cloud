@@ -1,5 +1,5 @@
 const App = (() => {
-  let state = {
+  const state = {
     bank: null,
     match: null,
     progress: null,
@@ -35,13 +35,11 @@ const App = (() => {
     if(t) t.classList.add('active');
     window.scrollTo(0,0);
   }
-
   function escapeHtml(s){
-    return String(s||'').replace(/[&<>"']/g, c => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[c]));
+    return String(s||'').replace(/[&<>"']/g, c => (
+      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+    ));
   }
-
   function showToast(msg, type){
     const div = document.createElement('div');
     div.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);'+
@@ -52,9 +50,7 @@ const App = (() => {
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 2500);
   }
-
-  function pad(n){ return String(n).padStart(2,'0'); }
-
+  function isOnline(){ return window.Cloud && window.Cloud.isConnected(); }
   function refreshUserInfo(){
     const u = Storage.getPlayer();
     const el = $('#userInfo');
@@ -67,20 +63,17 @@ const App = (() => {
       if(out) out.classList.add('hidden');
     }
   }
-
   function fmtBJFull(ts){
     if(!ts) return '-';
     const d = new Date(ts);
     if(isNaN(d.getTime())) return '-';
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
-
   function logout(){
-    if(!confirm('确定退出登录？\n当前答题进度将被清除')) return;
+    if(!confirm('确定退出登录？当前答题进度将被清除')) return;
     if(state.timer){ clearInterval(state.timer); state.timer = null; }
     Storage.clearPlayer();
     Storage.clearProgress(state.playerKey);
-    Storage.clearResult ? null : null;
     localStorage.removeItem('exam_result_' + state.playerKey);
     state.progress = null;
     state.bank = null;
@@ -171,7 +164,6 @@ const App = (() => {
     const allQs = TriggerEngine.getQuestionsByModule(state.bank, moduleId);
     const unlockedQs = allQs.filter(q => state.progress.unlockedQuestions.includes(q.id));
     state.unlockedQuestions = unlockedQs.map(q => q.id);
-    const totalAll = allQs.length;
     const unlockedCount = unlockedQs.length;
     const answeredCount = unlockedQs.filter(q => {
       const a = state.progress.answers[q.id];
@@ -184,7 +176,7 @@ const App = (() => {
       list.innerHTML = `<div class="muted" style="text-align:center;padding:30px">
         <div style="font-size:32px;margin-bottom:10px">🔒</div>
         <div>该模块暂未解锁任何题目</div>
-        <div class="small mt-10">本模块共 ${totalAll} 道题，正在等待触发条件</div>
+        <div class="small mt-10">本模块共 ${allQs.length} 道题，正在等待触发条件</div>
       </div>`;
     } else {
       list.innerHTML = unlockedQs.map((q,i) => {
@@ -313,29 +305,6 @@ const App = (() => {
     state.currentValue = checked;
   }
 
-  function isOnline(){ return window.Cloud && window.Cloud.isConnected(); }
-
-  async function syncProgressToCloud(){
-    if(!isOnline() || !state.match || !state.match.id) return;
-    try {
-      await window.Cloud.upsertProgress(
-        state.match.id,
-        state.player.name,
-        state.player.inviteCode,
-        state.progress
-      );
-      if(state.currentQuestion && state.progress.answers[state.currentQuestion]){
-        await window.Cloud.upsertAnswer(
-          state.match.id,
-          state.player.name,
-          state.player.inviteCode,
-          state.currentQuestion,
-          state.progress.answers[state.currentQuestion]
-        );
-      }
-    } catch(err){ console.warn('云端同步失败:', err); }
-  }
-
   async function saveDraft(){
     if(!state.currentQuestion) return;
     const val = state.currentValue;
@@ -382,6 +351,29 @@ const App = (() => {
     setTimeout(() => {
       if(state.currentModule) openModule(state.currentModule);
     }, 800);
+  }
+
+  function isOnline(){ return window.Cloud && window.Cloud.isConnected(); }
+
+  async function syncProgressToCloud(){
+    if(!isOnline() || !state.match || !state.match.id) return;
+    try {
+      await window.Cloud.upsertProgress(
+        state.match.id,
+        state.player.name,
+        state.player.inviteCode,
+        state.progress
+      );
+      if(state.currentQuestion && state.progress.answers[state.currentQuestion]){
+        await window.Cloud.upsertAnswer(
+          state.match.id,
+          state.player.name,
+          state.player.inviteCode,
+          state.currentQuestion,
+          state.progress.answers[state.currentQuestion]
+        );
+      }
+    } catch(err){ console.warn('云端同步失败:', err); }
   }
 
   async function finishExam(){
@@ -594,8 +586,8 @@ const App = (() => {
     }
 
     let progress = Storage.getProgress(state.playerKey);
-    if(!progress && state.bank){
-      progress = TriggerEngine.initProgress(state.bank, ['现勘']);
+    if(!progress){
+      progress = { unlockedModules:[], unlockedQuestions:[], answers:{}, finished:false, startedAt:null, expiresAt:null, submittedCount:0, correctCount:0 };
     }
 
     if(match.status === 'running' && match.expiresAt){
@@ -606,7 +598,6 @@ const App = (() => {
         progress.expiresAt = match.expiresAt;
       }
     } else if(match.status === 'pending'){
-      // Do not start countdown before the judge starts the match.
       progress.startedAt = null;
       progress.expiresAt = null;
     } else {
@@ -817,7 +808,7 @@ const App = (() => {
             state.progress.unlockedQuestions = m.bankSnapshot.questions.map(q => q.id);
             Storage.saveProgress(state.playerKey, state.progress);
             if(state.currentModule){
-              renderModule(state.currentModule);
+              openModule(state.currentModule);
             } else {
               renderDashboard();
             }
@@ -829,38 +820,38 @@ const App = (() => {
 
     Judge.init();
 
-     $$('[data-view]').forEach(b => {
-       b.addEventListener('click', () => {
-         const v = b.dataset.view;
-         if(v === 'home') showView('home');
-         else if(v === 'login'){
-           showView('login');
-           refreshLoginMatchStatus();
-         }
-       });
-     });
-     $$('[data-go]').forEach(b => {
-       b.addEventListener('click', () => {
-         const go = b.dataset.go;
-         if(go === 'dashboard') renderDashboard();
-       });
-     });
+    $$('[data-view]').forEach(b => {
+      b.addEventListener('click', () => {
+        const v = b.dataset.view;
+        if(v === 'home') showView('home');
+        else if(v === 'login'){
+          showView('login');
+          refreshLoginMatchStatus();
+        }
+      });
+    });
+    $$('[data-go]').forEach(b => {
+      b.addEventListener('click', () => {
+        const go = b.dataset.go;
+        if(go === 'dashboard') renderDashboard();
+      });
+    });
 
-     /* Home role buttons: bound after DOM is ready so the buttons exist. */
-     $$('[data-role]').forEach(b => {
-       b.addEventListener('click', () => {
-         const role = b.dataset.role;
-         if(role === 'player'){
-           showView('login');
-           setTimeout(() => {
-             if(window.App && window.App.refreshLoginMatchStatus) window.App.refreshLoginMatchStatus();
-           }, 50);
-         } else if(role === 'judge'){
-           if(typeof showView === 'function') showView('judge-auth');
-           if(typeof initJudgeAuth === 'function') initJudgeAuth();
-         }
-       });
-     });
+    /* Home role buttons: bound after DOM is ready so the buttons exist. */
+    $$('[data-role]').forEach(b => {
+      b.addEventListener('click', () => {
+        const role = b.dataset.role;
+        if(role === 'player'){
+          showView('login');
+          setTimeout(() => {
+            if(window.App && window.App.refreshLoginMatchStatus) window.App.refreshLoginMatchStatus();
+          }, 50);
+        } else if(role === 'judge'){
+          if(typeof showView === 'function') showView('judge-auth');
+          if(typeof initJudgeAuth === 'function') initJudgeAuth();
+        }
+      });
+    });
 
     $('#loginSubmit').addEventListener('click', async () => {
       const name = $('#loginName').value.trim();
@@ -885,7 +876,7 @@ const App = (() => {
       };
 
       try {
-        const v = await window.Cloud && window.Cloud.isConnected()
+        const v = window.Cloud && window.Cloud.isConnected()
           ? await Promise.race([
               Match.validateLogin(name, roomId, inviteCode),
               new Promise((_, reject) => setTimeout(() => reject(new Error('验证超时（10秒），请检查网络')), 10000))
@@ -904,7 +895,7 @@ const App = (() => {
 
         let bank = null;
         let match = null;
-        let encryptedBank = v.match.encryptedBank;
+        const encryptedBank = v.match.encryptedBank;
 
         if(v.online && v.match.id){
           status.textContent = '☁️ 加载比赛数据...';
@@ -998,6 +989,7 @@ const App = (() => {
           progress = { unlockedModules:[], unlockedQuestions:[], answers:{}, finished:false, startedAt:null, expiresAt:null, submittedCount:0, correctCount:0 };
         }
 
+        if(match.status === 'running' && match.expiresAt){
           if(match.expiresAt <= Date.now()){
             status.textContent = '⚠️ 本场比赛已超时，无法进入';
             status.style.color = 'var(--danger)';
@@ -1013,7 +1005,6 @@ const App = (() => {
             progress.expiresAt = match.expiresAt;
           }
         } else if(match.status === 'pending'){
-          // Pending matches should not start timing on the player side.
           progress.startedAt = null;
           progress.expiresAt = null;
         } else {
@@ -1043,18 +1034,17 @@ const App = (() => {
         if(match.status === 'pending'){
           showWaitingForStart();
           subscribeToMatch(match.id);
-        } else if(match.status === 'finished'){
+          return;
+        }
+        if(match.status === 'finished'){
           showToast('比赛已结束', 'err');
           status.textContent = '⚠️ 本场比赛已结束';
           status.style.color = 'var(--danger)';
           Storage.clearPlayer();
           cleanup();
           return;
-        } else {
-          renderDashboard();
         }
-
-        cleanup();
+        renderDashboard();
       } catch(err){
         console.error('[登录] 错误:', err);
         status.textContent = '❌ ' + (err.message || '登录失败');

@@ -12,6 +12,13 @@ const App = (() => {
 
   function $(s){ return document.querySelector(s); }
   function $$(s){ return document.querySelectorAll(s); }
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function fmtBJ(ts){
+    if(!ts) return '-';
+    const d = new Date(ts);
+    if(isNaN(d.getTime())) return '-';
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
 
   function showView(name){
     $$('.view').forEach(v => v.classList.remove('active'));
@@ -50,6 +57,13 @@ const App = (() => {
       el.textContent = '';
       if(out) out.classList.add('hidden');
     }
+  }
+
+  function fmtBJFull(ts){
+    if(!ts) return '-';
+    const d = new Date(ts);
+    if(isNaN(d.getTime())) return '-';
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   function logout(){

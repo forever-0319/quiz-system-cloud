@@ -8,6 +8,26 @@ const Judge = (() => {
   function $$(s){ return document.querySelectorAll(s); }
   function pad(n){ return String(n).padStart(2,'0'); }
 
+  function fmtBJ(ts){
+    if(!ts) return '-';
+    const d = new Date(ts);
+    if(isNaN(d.getTime())) return '-';
+    const Y = d.getFullYear();
+    const M = pad(d.getMonth()+1);
+    const D = pad(d.getDate());
+    const h = pad(d.getHours());
+    const m = pad(d.getMinutes());
+    const s = pad(d.getSeconds());
+    return `${Y}-${M}-${D} ${h}:${m}:${s}`;
+  }
+
+  function fmtBJShort(ts){
+    if(!ts) return '-';
+    const d = new Date(ts);
+    if(isNaN(d.getTime())) return '-';
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   function showView(name){
     $$('.view').forEach(v => v.classList.remove('active'));
     const t = document.getElementById('view-' + name);
@@ -115,7 +135,7 @@ const Judge = (() => {
     } else if(m.status === 'finished'){
       control.innerHTML = `
         <p>状态：<b>已结束</b></p>
-        <p class="muted small">${m.finishedAt ? '结束时间：' + new Date(m.finishedAt).toLocaleString() : ''}</p>
+        <p class="muted small">${m.finishedAt ? '结束时间（北京时间）：' + fmtBJ(m.finishedAt) : ''}</p>
       `;
       refreshPlayerList();
     }
@@ -654,8 +674,7 @@ const Judge = (() => {
       return;
     }
     const list = banks.map(b => {
-      const dt = new Date(b.created_at);
-      return `${b.id.slice(0,8)}... | ${b.name} | ${dt.toLocaleDateString()}`;
+      return `${b.id.slice(0,8)}... | ${b.name} | ${fmtBJ(b.created_at)}`;
     }).join('\n');
     alert('云端题库：\n' + list);
   }
@@ -914,10 +933,9 @@ const Judge = (() => {
                 'running': '<span style="color:var(--success)">▶ 进行中</span>',
                 'finished': '<span style="color:var(--muted)">✓ 已结束</span>'
               }[m.status] || m.status;
-              const dt = new Date(m.created_at);
-              const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-              const startStr = m.started_at ? new Date(m.started_at).toLocaleString() : '-';
-              const endStr = m.finished_at ? new Date(m.finished_at).toLocaleString() : '-';
+              const dateStr = fmtBJ(m.created_at);
+              const startStr = m.started_at ? fmtBJ(m.started_at) : '-';
+              const endStr = m.finished_at ? fmtBJ(m.finished_at) : '-';
               const bankOk = m.bank_id ? '✓' : '-';
               return `
                 <tr ${isCurrent ? 'style="background:#fef3c7"' : ''}>

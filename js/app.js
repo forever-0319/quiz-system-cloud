@@ -609,7 +609,17 @@ const App = (() => {
       return;
     }
     if(match.status === 'finished'){
-      renderResult();
+      Storage.clearPlayer();
+      showView('home');
+      showToast('本场比赛已结束', 'err');
+      return;
+    }
+    if(match.status === 'running' && match.expiresAt && match.expiresAt <= Date.now()){
+      Storage.clearPlayer();
+      Storage.clearProgress(state.playerKey);
+      localStorage.removeItem('exam_result_' + state.playerKey);
+      showView('home');
+      showToast('比赛已超时，请联系裁判', 'err');
       return;
     }
     startTimer(match.expiresAt);
@@ -920,12 +930,24 @@ const App = (() => {
       }
 
       if(match.status === 'running' && match.expiresAt){
+        if(match.expiresAt <= Date.now()){
+          status.textContent = '⚠️ 本场比赛已超时，无法进入';
+          status.style.color = 'var(--danger)';
+          showToast('本场比赛已超时，请联系裁判', 'err');
+          Storage.clearPlayer();
+          return;
+        }
         startTimer(match.expiresAt);
       }
       if(Judge && Judge.refreshPlayerList) Judge.refreshPlayerList();
       if(match.status === 'pending'){
         showWaitingForStart();
         subscribeToMatch(match.id);
+      } else if(match.status === 'finished'){
+        showToast('比赛已结束', 'err');
+        status.textContent = '⚠️ 本场比赛已结束';
+        status.style.color = 'var(--danger)';
+        Storage.clearPlayer();
       } else {
         renderDashboard();
       }

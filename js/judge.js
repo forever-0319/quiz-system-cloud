@@ -12,43 +12,31 @@ const Judge = (() => {
     if(!ts) return '-';
     const d = new Date(ts);
     if(isNaN(d.getTime())) return '-';
-    try {
-      return d.toLocaleString('zh-CN', {
-        timeZone: 'Asia/Shanghai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      }).replace(/\//g, '-');
-    } catch(e){
-      const offset = 8 * 60;
-      const local = new Date(d.getTime() + offset * 60 * 1000);
-      return `${local.getUTCFullYear()}-${pad(local.getUTCMonth()+1)}-${pad(local.getUTCDate())} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}`;
-    }
+    const utcMs = d.getTime();
+    const bjMs = utcMs + 8 * 60 * 60 * 1000;
+    const bj = new Date(bjMs);
+    const Y = bj.getUTCFullYear();
+    const M = pad(bj.getUTCMonth()+1);
+    const D = pad(bj.getUTCDate());
+    const h = pad(bj.getUTCHours());
+    const m = pad(bj.getUTCMinutes());
+    const s = pad(bj.getUTCSeconds());
+    return `${Y}-${M}-${D} ${h}:${m}:${s}`;
   }
 
   function fmtBJShort(ts){
     if(!ts) return '-';
     const d = new Date(ts);
     if(isNaN(d.getTime())) return '-';
-    try {
-      return d.toLocaleString('zh-CN', {
-        timeZone: 'Asia/Shanghai',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).replace(/\//g, '-');
-    } catch(e){
-      const offset = 8 * 60;
-      const local = new Date(d.getTime() + offset * 60 * 1000);
-      return `${local.getUTCFullYear()}-${pad(local.getUTCMonth()+1)}-${pad(local.getUTCDate())} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}`;
-    }
+    const utcMs = d.getTime();
+    const bjMs = utcMs + 8 * 60 * 60 * 1000;
+    const bj = new Date(bjMs);
+    const Y = bj.getUTCFullYear();
+    const M = pad(bj.getUTCMonth()+1);
+    const D = pad(bj.getUTCDate());
+    const h = pad(bj.getUTCHours());
+    const m = pad(bj.getUTCMinutes());
+    return `${Y}-${M}-${D} ${h}:${m}`;
   }
 
   function showView(name){

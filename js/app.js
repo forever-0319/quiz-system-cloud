@@ -922,6 +922,7 @@ const App = (() => {
         if(match.encryptedBank && match.encryptedBank.bankId && (window.Cloud && window.Cloud.isConnected())){
           status.textContent = '☁️ 加载题库...';
           try {
+            console.log('[登录] 题库引用:', match.encryptedBank);
             const cloudBank = await Promise.race([
               window.Cloud.getBank(match.encryptedBank.bankId),
               new Promise((_, reject) => setTimeout(() => reject(new Error('加载题库超时')), 8000))
@@ -959,6 +960,10 @@ const App = (() => {
           status.style.color = 'var(--danger)';
           cleanup();
           return;
+        }
+
+        if(!match.encryptedBank || !match.encryptedBank.bankId){
+          console.warn('[登录] 比赛没有题库引用:', match);
         }
 
         const player = { name, roomId, inviteCode, loggedAt:Date.now() };

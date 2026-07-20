@@ -978,11 +978,10 @@ const App = (() => {
         state.match = match;
 
         let progress = Storage.getProgress(state.playerKey);
-        if(!progress && state.bank){
-          progress = TriggerEngine.initProgress(state.bank, ['现勘']);
+        if(!progress){
+          progress = { unlockedModules:[], unlockedQuestions:[], answers:{}, finished:false, startedAt:null, expiresAt:null, submittedCount:0, correctCount:0 };
         }
 
-        if(match.status === 'running' && match.expiresAt){
           if(match.expiresAt <= Date.now()){
             status.textContent = '⚠️ 本场比赛已超时，无法进入';
             status.style.color = 'var(--danger)';

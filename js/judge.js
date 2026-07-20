@@ -12,20 +12,43 @@ const Judge = (() => {
     if(!ts) return '-';
     const d = new Date(ts);
     if(isNaN(d.getTime())) return '-';
-    const Y = d.getFullYear();
-    const M = pad(d.getMonth()+1);
-    const D = pad(d.getDate());
-    const h = pad(d.getHours());
-    const m = pad(d.getMinutes());
-    const s = pad(d.getSeconds());
-    return `${Y}-${M}-${D} ${h}:${m}:${s}`;
+    try {
+      return d.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).replace(/\//g, '-');
+    } catch(e){
+      const offset = 8 * 60;
+      const local = new Date(d.getTime() + offset * 60 * 1000);
+      return `${local.getUTCFullYear()}-${pad(local.getUTCMonth()+1)}-${pad(local.getUTCDate())} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}`;
+    }
   }
 
   function fmtBJShort(ts){
     if(!ts) return '-';
     const d = new Date(ts);
     if(isNaN(d.getTime())) return '-';
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    try {
+      return d.toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).replace(/\//g, '-');
+    } catch(e){
+      const offset = 8 * 60;
+      const local = new Date(d.getTime() + offset * 60 * 1000);
+      return `${local.getUTCFullYear()}-${pad(local.getUTCMonth()+1)}-${pad(local.getUTCDate())} ${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}`;
+    }
   }
 
   function showView(name){

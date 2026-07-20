@@ -829,22 +829,38 @@ const App = (() => {
 
     Judge.init();
 
-    $$('[data-view]').forEach(b => {
-      b.addEventListener('click', () => {
-        const v = b.dataset.view;
-        if(v === 'home') showView('home');
-        else if(v === 'login'){
-          showView('login');
-          refreshLoginMatchStatus();
-        }
-      });
-    });
-    $$('[data-go]').forEach(b => {
-      b.addEventListener('click', () => {
-        const go = b.dataset.go;
-        if(go === 'dashboard') renderDashboard();
-      });
-    });
+     $$('[data-view]').forEach(b => {
+       b.addEventListener('click', () => {
+         const v = b.dataset.view;
+         if(v === 'home') showView('home');
+         else if(v === 'login'){
+           showView('login');
+           refreshLoginMatchStatus();
+         }
+       });
+     });
+     $$('[data-go]').forEach(b => {
+       b.addEventListener('click', () => {
+         const go = b.dataset.go;
+         if(go === 'dashboard') renderDashboard();
+       });
+     });
+
+     /* Home role buttons: bound after DOM is ready so the buttons exist. */
+     $$('[data-role]').forEach(b => {
+       b.addEventListener('click', () => {
+         const role = b.dataset.role;
+         if(role === 'player'){
+           showView('login');
+           setTimeout(() => {
+             if(window.App && window.App.refreshLoginMatchStatus) window.App.refreshLoginMatchStatus();
+           }, 50);
+         } else if(role === 'judge'){
+           if(typeof showView === 'function') showView('judge-auth');
+           if(typeof initJudgeAuth === 'function') initJudgeAuth();
+         }
+       });
+     });
 
     $('#loginSubmit').addEventListener('click', async () => {
       const name = $('#loginName').value.trim();

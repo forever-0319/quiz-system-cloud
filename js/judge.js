@@ -843,20 +843,7 @@ const Judge = (() => {
       showToast('🏁 选手已完成比赛（云端）', 'ok');
     });
 
-    $$('[data-role]').forEach(b => {
-      b.addEventListener('click', () => {
-        const role = b.dataset.role;
-        if(role === 'player'){
-          showView('login');
-          setTimeout(() => {
-            if(window.App && window.App.refreshLoginMatchStatus) window.App.refreshLoginMatchStatus();
-          }, 50);
-        } else if(role === 'judge'){
-          showView('judge-auth');
-          initJudgeAuth();
-        }
-      });
-    });
+     /* home role buttons are bound in app.js after DOM is ready */
 
     $('#judgeSetupBtn').addEventListener('click', setupJudge);
     $('#judgeLoginBtn').addEventListener('click', loginJudge);

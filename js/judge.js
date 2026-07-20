@@ -447,6 +447,8 @@ const Judge = (() => {
     const codeCount = parseInt($('#jInviteCount').value, 10) || 3;
     const pwd = prompt('请设置题库密码（至少 4 位）：', '');
     if(!pwd || pwd.length < 4){ showToast('密码无效', 'err'); return; }
+    saveConfigPreference();
+    showToast(`📋 将生成 ${codeCount} 个邀请码，时长 ${minutes} 分钟`, 'ok');
 
     let encryptedBank = null;
     if(isOnline()){
@@ -513,10 +515,36 @@ const Judge = (() => {
     showView('judge');
     $('#userInfo').textContent = '👨‍⚖️ 裁判';
     $('#logoutBtn').classList.remove('hidden');
-    $('#jMinutes').value = Storage.getMatch()?.totalMinutes || 120;
-    $('#jInviteCount').value = Storage.getMatch()?.codes.length || 5;
+    if(!Storage.getMatch()){
+      const storedMin = localStorage.getItem('cfg_minutes');
+      const storedCount = localStorage.getItem('cfg_inviteCount');
+      if(storedMin) $('#jMinutes').value = storedMin;
+      if(storedCount) $('#jInviteCount').value = storedCount;
+    }
     refreshBankStatus();
     refreshMatchUI();
+    updateConfigPreview();
+  }
+
+  function updateConfigPreview(){
+    const minutes = parseInt($('#jMinutes').value, 10) || 120;
+    const codeCount = parseInt($('#jInviteCount').value, 10) || 5;
+    $('#jPreviewMinutes').textContent = minutes;
+    $('#jPreviewCodes').textContent = codeCount;
+  }
+
+  function resetConfig(){
+    $('#jMinutes').value = 120;
+    $('#jInviteCount').value = 5;
+    localStorage.removeItem('cfg_minutes');
+    localStorage.removeItem('cfg_inviteCount');
+    updateConfigPreview();
+    showToast('🔄 已重置为默认值：120 分钟 / 5 个邀请码', 'ok');
+  }
+
+  function saveConfigPreference(){
+    localStorage.setItem('cfg_minutes', $('#jMinutes').value);
+    localStorage.setItem('cfg_inviteCount', $('#jInviteCount').value);
   }
 
   function logoutJudge(){
@@ -645,6 +673,8 @@ const Judge = (() => {
     const codeCount = parseInt($('#jInviteCount').value, 10);
     if(!minutes || minutes < 1){ showToast('时长无效', 'err'); return; }
     if(!codeCount || codeCount < 1){ showToast('邀请码数量无效', 'err'); return; }
+    saveConfigPreference();
+    showToast(`📋 将生成 ${codeCount} 个邀请码，时长 ${minutes} 分钟`, 'ok');
     const bank = Storage.getBank();
     if(!bank){ showToast('请先加载题库', 'err'); return; }
 
@@ -796,6 +826,16 @@ const Judge = (() => {
 
     $('#jCreateMatch').addEventListener('click', createMatchClick);
     $('#jCreateMatchQuick')?.addEventListener('click', createMatchQuick);
+    $('#jResetConfig')?.addEventListener('click', resetConfig);
+    ['#jMinutes', '#jInviteCount'].forEach(sel => {
+      const el = $(sel);
+      if(el){
+        el.addEventListener('input', () => {
+          updateConfigPreview();
+          saveConfigPreference();
+        });
+      }
+    });
     $('#jCopyRoom').addEventListener('click', () => {
       const rid = $('#jRoomId').textContent;
       if(rid) copyText(rid);

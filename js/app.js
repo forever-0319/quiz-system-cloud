@@ -605,6 +605,10 @@ const App = (() => {
       } else if(!progress.expiresAt){
         progress.expiresAt = match.expiresAt;
       }
+    } else if(match.status === 'pending'){
+      // Do not start countdown before the judge starts the match.
+      progress.startedAt = null;
+      progress.expiresAt = null;
     } else {
       if(!progress.startedAt){
         TriggerEngine.startExam(progress, match.totalMinutes);
@@ -669,17 +673,23 @@ const App = (() => {
       window._currentSub = {
         id: matchId,
         unsubscribe: window.Cloud.subscribeMatch(matchId, msg => {
-          if(msg.type === 'answer' || msg.type === 'progress'){
+          if(msg.type === 'answer' || msg.type === 'progress' || msg.type === 'result'){
             window.Cloud.getMatch(matchId).then(dbMatch => {
               if(!dbMatch) return;
               const localMatch = Storage.getMatch();
+              if(!localMatch) return;
               localMatch.status = dbMatch.status;
               if(dbMatch.expires_at) localMatch.expiresAt = new Date(dbMatch.expires_at).getTime();
               if(dbMatch.started_at) localMatch.startedAt = new Date(dbMatch.started_at).getTime();
+              if(dbMatch.finished_at) localMatch.finishedAt = new Date(dbMatch.finished_at).getTime();
               Storage.saveMatch(localMatch);
-              if(dbMatch.status === 'running' && state.progress && !state.progress.finished){
+              if(dbMatch.status === 'pending'){
+                showWaitingForStart();
+              } else if(dbMatch.status === 'running' && state.progress && !state.progress.finished){
                 startTimer(localMatch.expiresAt);
                 renderDashboard();
+              } else if(dbMatch.status === 'finished' && state.progress && !state.progress.finished){
+                finishExam();
               }
             });
           }
@@ -847,22 +857,192 @@ const App = (() => {
       if(!bankPwd){ showToast('请输入题库密码', 'err'); return; }
 
       const status = $('#loginStatus');
-      status.textContent = '☁️ 正在验证...';
+      const submitBtn = $('#loginSubmit');
+      status.textContent = '☁️ 正在验证（10秒超时）...';
       status.style.color = '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = '登录中...';
 
-      const v = await Match.validateLogin(name, roomId, inviteCode);
-      if(!v.ok){
-        status.textContent = '❌ ' + v.msg;
+      const cleanup = () => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '登录';
+      };
+
+      try {
+        const v = await window.Cloud && window.Cloud.isConnected()
+          ? await Promise.race([
+              Match.validateLogin(name, roomId, inviteCode),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('验证超时（10秒），请检查网络')), 10000))
+            ])
+          : await Match.validateLogin(name, roomId, inviteCode);
+        if(!v.ok){
+          status.textContent = '❌ ' + v.msg;
+          status.style.color = 'var(--danger)';
+          showToast('❌ ' + v.msg, 'err');
+          cleanup();
+          return;
+        }
+
+        status.textContent = '☁️ 标记邀请码...';
+        await Match.useCode(roomId, inviteCode, name);
+
+        let bank = null;
+        let match = null;
+        let encryptedBank = v.match.encryptedBank;
+
+        if(v.online && v.match.id){
+          status.textContent = '☁️ 加载比赛数据...';
+          try {
+            const dbMatch = await Promise.race([
+              window.Cloud.getMatch(v.match.id),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('加载比赛超时')), 8000))
+            ]);
+            match = {
+              id: dbMatch.id,
+              roomId: dbMatch.room_id,
+              totalMinutes: dbMatch.total_minutes,
+              status: dbMatch.status,
+              startedAt: dbMatch.started_at ? new Date(dbMatch.started_at).getTime() : null,
+              expiresAt: dbMatch.expires_at ? new Date(dbMatch.expires_at).getTime() : null,
+              finishedAt: dbMatch.finished_at ? new Date(dbMatch.finished_at).getTime() : null,
+              createdAt: new Date(dbMatch.created_at).getTime(),
+              encryptedBank: encryptedBank
+            };
+            Storage.saveMatch(match);
+          } catch(err){
+            console.warn('云端比赛拉取失败:', err);
+            status.textContent = '⚠️ ' + err.message + '，使用本地数据';
+          }
+        }
+
+        if(!match){
+          match = v.match;
+        }
+
+        if(match.encryptedBank && match.encryptedBank.bankId && (window.Cloud && window.Cloud.isConnected())){
+          status.textContent = '☁️ 加载题库...';
+          try {
+            const cloudBank = await Promise.race([
+              window.Cloud.getBank(match.encryptedBank.bankId),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('加载题库超时')), 8000))
+            ]);
+            if(cloudBank && cloudBank.encrypted_data){
+              const cached = localStorage.getItem('cached_bank_' + match.id);
+              if(cached){
+                try { bank = JSON.parse(cached); state.bank = bank; }
+                catch(e){}
+              }
+              if(!bank){
+                try {
+                  bank = await Crypto.decrypt(cloudBank.encrypted_data, bankPwd);
+                  localStorage.setItem('cached_bank_' + match.id, JSON.stringify(bank));
+                  state.bank = bank;
+                  showToast('✅ 题库已解锁', 'ok');
+                } catch(err){
+                  status.textContent = '❌ 题库密码错误';
+                  status.style.color = 'var(--danger)';
+                  showToast('❌ 题库密码错误', 'err');
+                  Storage.clearPlayer();
+                  cleanup();
+                  return;
+                }
+              }
+            }
+          } catch(err){
+            console.warn('云端题库拉取失败:', err);
+            status.textContent = '⚠️ ' + err.message;
+          }
+        }
+
+        if(!match){
+          status.textContent = '❌ 找不到比赛数据';
+          status.style.color = 'var(--danger)';
+          cleanup();
+          return;
+        }
+
+        const player = { name, roomId, inviteCode, loggedAt:Date.now() };
+        Storage.savePlayer(player);
+        refreshUserInfo();
+
+        state.player = player;
+        state.playerKey = roomId + '_' + inviteCode;
+        if(!state.bank && match.bankSnapshot){
+          state.bank = match.bankSnapshot;
+        }
+        state.match = match;
+
+        let progress = Storage.getProgress(state.playerKey);
+        if(!progress && state.bank){
+          progress = TriggerEngine.initProgress(state.bank, ['现勘']);
+        }
+
+        if(match.status === 'running' && match.expiresAt){
+          if(match.expiresAt <= Date.now()){
+            status.textContent = '⚠️ 本场比赛已超时，无法进入';
+            status.style.color = 'var(--danger)';
+            showToast('本场比赛已超时，请联系裁判', 'err');
+            Storage.clearPlayer();
+            cleanup();
+            return;
+          }
+          if(!progress.startedAt){
+            progress.startedAt = match.startedAt || Date.now();
+            progress.expiresAt = match.expiresAt;
+          } else if(!progress.expiresAt){
+            progress.expiresAt = match.expiresAt;
+          }
+        } else if(match.status === 'pending'){
+          // Pending matches should not start timing on the player side.
+          progress.startedAt = null;
+          progress.expiresAt = null;
+        } else {
+          if(!progress.startedAt){
+            TriggerEngine.startExam(progress, match.totalMinutes);
+          }
+        }
+
+        Storage.saveProgress(state.playerKey, progress);
+        state.progress = progress;
+
+        if(window.Cloud && window.Cloud.isConnected() && match.id){
+          try {
+            await window.Cloud.upsertProgress(match.id, name, inviteCode, progress);
+          } catch(err){}
+        }
+
+        if(window.Realtime && match.id) window.Realtime.setMatch(match.id);
+
+        status.textContent = '';
+        cleanup();
+
+        if(progress.finished){
+          renderResult();
+          return;
+        }
+        if(match.status === 'pending'){
+          showWaitingForStart();
+          subscribeToMatch(match.id);
+        } else if(match.status === 'finished'){
+          showToast('比赛已结束', 'err');
+          status.textContent = '⚠️ 本场比赛已结束';
+          status.style.color = 'var(--danger)';
+          Storage.clearPlayer();
+          cleanup();
+          return;
+        } else {
+          renderDashboard();
+        }
+
+        cleanup();
+      } catch(err){
+        console.error('[登录] 错误:', err);
+        status.textContent = '❌ ' + (err.message || '登录失败');
         status.style.color = 'var(--danger)';
-        showToast('❌ ' + v.msg, 'err');
-        return;
+        showToast('❌ ' + (err.message || '登录失败'), 'err');
+        cleanup();
       }
-
-      await Match.useCode(roomId, inviteCode, name);
-
-      let bank = null;
-      let match = null;
-      let encryptedBank = v.match.encryptedBank;
+    });
 
       if(v.online && v.match.id){
         try {

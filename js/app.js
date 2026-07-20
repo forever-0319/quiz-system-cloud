@@ -536,12 +536,31 @@ const App = (() => {
       try {
         const cloudBank = await window.Cloud.getBank(match.encryptedBank.bankId);
         if(cloudBank && cloudBank.encrypted_data){
-          const bankPwd = prompt('请输入题库密码继续答题：');
-          if(bankPwd){
+          const cached = localStorage.getItem('cached_bank_' + match.id);
+          if(cached){
             try {
-              state.bank = await Crypto.decrypt(cloudBank.encrypted_data, bankPwd);
-            } catch(err){
-              console.warn('题库解锁失败，使用本地:', err);
+              state.bank = JSON.parse(cached);
+            } catch(e){}
+          }
+          if(!state.bank){
+            const bankPwd = prompt('请输入题库密码继续答题：');
+            if(bankPwd){
+              try {
+                state.bank = await Crypto.decrypt(cloudBank.encrypted_data, bankPwd);
+                localStorage.setItem('cached_bank_' + match.id, JSON.stringify(state.bank));
+              } catch(err){
+                console.warn('题库解锁失败:', err);
+                Storage.clearPlayer();
+                state.match = null;
+                showView('home');
+                showToast('题库密码错误，请重新登录', 'err');
+                return;
+              }
+            } else {
+              Storage.clearPlayer();
+              state.match = null;
+              showView('home');
+              return;
             }
           }
         }
@@ -788,10 +807,11 @@ const App = (() => {
       const name = $('#loginName').value.trim();
       const roomId = $('#loginRoom').value.trim().toUpperCase();
       const inviteCode = $('#loginInvite').value.trim().toUpperCase();
-      const bankPwd = prompt('请输入题库密码（裁判会给您）:') || '';
+      const bankPwd = $('#loginBankPwd').value;
       if(!name){ showToast('请输入姓名', 'err'); return; }
       if(!roomId){ showToast('请输入房间号', 'err'); return; }
       if(!inviteCode){ showToast('请输入邀请码', 'err'); return; }
+      if(!bankPwd){ showToast('请输入题库密码', 'err'); return; }
 
       const status = $('#loginStatus');
       status.textContent = '☁️ 正在验证...';

@@ -46,11 +46,12 @@
     <div class="card">
       <button class="btn ghost small" data-view="home">← 返回</button>
       <h2>选手登录</h2>
-      <div id="loginMatchStatus" class="match-status-box"></div>
+      <div id="loginMatchStatus"></div>
       <div class="form">
         <label>姓名：<input type="text" id="loginName" placeholder="请输入您的姓名"></label>
         <label>房间号：<input type="text" id="loginRoom" placeholder="裁判告诉您的房间号" autocapitalize="characters" style="text-transform:uppercase"></label>
         <label>邀请码：<input type="text" id="loginInvite" placeholder="邀请码" autocapitalize="characters" style="text-transform:uppercase"></label>
+        <label>题库密码：<input type="password" id="loginBankPwd" placeholder="裁判会给您这个密码"></label>
         <button id="loginSubmit" class="btn primary">登录</button>
       </div>
       <div id="loginStatus" class="status muted"></div>

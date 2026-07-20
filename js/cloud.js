@@ -176,6 +176,30 @@ const Cloud = (() => {
     return data || [];
   }
 
+  async function listMatches(judgeId){
+    if(!connected) return [];
+    let q = supabase.from('matches').select('*').order('created_at', {ascending:false});
+    if(judgeId) q = q.eq('judge_id', judgeId);
+    const { data, error } = await q;
+    if(error) throw error;
+    return data || [];
+  }
+
+  async function deleteMatch(matchId){
+    if(!connected) return false;
+    const { error: e1 } = await supabase.from('invite_codes').delete().eq('match_id', matchId);
+    if(e1) console.warn('删除邀请码失败:', e1);
+    const { error: e2 } = await supabase.from('player_progress').delete().eq('match_id', matchId);
+    if(e2) console.warn('删除进度失败:', e2);
+    const { error: e3 } = await supabase.from('answers').delete().eq('match_id', matchId);
+    if(e3) console.warn('删除答题失败:', e3);
+    const { error: e4 } = await supabase.from('match_results').delete().eq('match_id', matchId);
+    if(e4) console.warn('删除成绩失败:', e4);
+    const { error } = await supabase.from('matches').delete().eq('id', matchId);
+    if(error) throw error;
+    return true;
+  }
+
   async function markCodeUsed(matchId, code, playerName){
     const { error } = await supabase.from('invite_codes')
       .update({ used: true, player_name: playerName, used_at: new Date().toISOString() })
@@ -321,6 +345,7 @@ const Cloud = (() => {
     saveBank, listBanks, getBank, deleteBank,
     createMatch, updateMatch, getMatch, getMatchByRoom,
     addInviteCodes, listInviteCodes, markCodeUsed,
+    listMatches, deleteMatch,
     upsertProgress, getProgress, listMatchProgress, setPlayerUnlocked,
     upsertAnswer, listAnswers, listAllMatchAnswers,
     upsertResult, listResults,

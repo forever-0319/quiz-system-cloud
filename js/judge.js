@@ -849,6 +849,9 @@ const Judge = (() => {
     $('#jExportStats').addEventListener('click', exportStats);
     $('#jForceEndAll').addEventListener('click', forceEndAll);
 
+    $('#jManageCloudMatches')?.addEventListener('click', showCloudMatchesModal);
+    $('#cloudMatchesClose')?.addEventListener('click', hideCloudMatchesModal);
+
     $('#playerModalClose').addEventListener('click', hidePlayerDetail);
     $('#playerForceSubmit').addEventListener('click', forceSubmitPlayer);
     $('#playerReset')?.addEventListener('click', resetPlayer);
@@ -858,8 +861,90 @@ const Judge = (() => {
     refreshMatchUI();
   }
 
+  async function showCloudMatchesModal(){
+    const body = $('#cloudMatchesBody');
+    body.innerHTML = '<div class="muted">☁️ 加载云端比赛列表...</div>';
+    $('#cloudMatchesModal').classList.remove('hidden');
+    if(!isOnline()){
+      body.innerHTML = '<div class="muted">⚠️ 云端未连接，无法列出比赛</div>';
+      return;
+    }
+    try {
+      const judgeId = window.Cloud.getJudgeId();
+      const matches = await window.Cloud.listMatches(judgeId);
+      if(!matches.length){
+        body.innerHTML = '<div class="muted">云端暂无比赛</div>';
+        return;
+      }
+      const curMatch = Storage.getMatch();
+      body.innerHTML = `
+        <p class="muted small">共 <b>${matches.length}</b> 场比赛，可单独删除（删除会级联清理所有相关数据）</p>
+        <table class="tbl">
+          <thead><tr>
+            <th>房间号</th><th>状态</th><th>时长</th><th>创建时间</th>
+            <th>开始</th><th>结束</th><th>题库</th><th>操作</th>
+          </tr></thead>
+          <tbody>
+            ${matches.map(m => {
+              const isCurrent = curMatch && curMatch.id === m.id;
+              const statusBadge = {
+                'pending': '<span style="color:#f59e0b">⏳ 待开始</span>',
+                'running': '<span style="color:var(--success)">▶ 进行中</span>',
+                'finished': '<span style="color:var(--muted)">✓ 已结束</span>'
+              }[m.status] || m.status;
+              const dt = new Date(m.created_at);
+              const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+              const startStr = m.started_at ? new Date(m.started_at).toLocaleString() : '-';
+              const endStr = m.finished_at ? new Date(m.finished_at).toLocaleString() : '-';
+              const bankOk = m.bank_id ? '✓' : '-';
+              return `
+                <tr ${isCurrent ? 'style="background:#fef3c7"' : ''}>
+                  <td><code>${m.room_id}</code>${isCurrent?' <span class="muted small">当前</span>':''}</td>
+                  <td>${statusBadge}</td>
+                  <td>${m.total_minutes}分</td>
+                  <td>${dateStr}</td>
+                  <td class="muted small">${startStr}</td>
+                  <td class="muted small">${endStr}</td>
+                  <td>${bankOk}</td>
+                  <td>
+                    <button class="btn small danger" onclick="Judge.deleteCloudMatch('${m.id}','${m.room_id}')">🗑 删除</button>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+        <p class="muted small mt-10">⚠️ 删除操作不可撤销。删除会级联清理该比赛的所有邀请码、答题记录、进度、成绩。</p>
+      `;
+    } catch(err){
+      body.innerHTML = `<div style="color:var(--danger)">❌ 加载失败：${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function hideCloudMatchesModal(){
+    $('#cloudMatchesModal').classList.add('hidden');
+  }
+
+  async function deleteCloudMatch(matchId, roomId){
+    if(!confirm(`确定删除比赛「${roomId}」？\n\n此操作不可撤销：\n- 删除该比赛的所有邀请码\n- 删除所有选手答题记录\n- 删除所有成绩`)) return;
+    try {
+      await window.Cloud.deleteMatch(matchId);
+      showToast('✅ 已删除', 'ok');
+      const cur = Storage.getMatch();
+      if(cur && cur.id === matchId){
+        Storage.clearMatch();
+        Storage.clearPlayer();
+        if(realtimeUnsub){ realtimeUnsub(); realtimeUnsub = null; }
+        refreshMatchUI();
+      }
+      showCloudMatchesModal();
+    } catch(err){
+      showToast('❌ 删除失败：' + err.message, 'err');
+    }
+  }
+
   return {
     init, refreshPlayerList, refreshMatchUI, refreshBankStatus,
-    showPlayerDetail, uploadBankToCloud, listCloudBanks
+    showPlayerDetail, uploadBankToCloud, listCloudBanks,
+    showCloudMatchesModal, deleteCloudMatch
   };
 })();

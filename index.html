@@ -181,6 +181,7 @@
         <button id="jExportMatch" class="btn primary">📦 导出比赛包</button>
         <button id="jExportStats" class="btn ghost">⬇ 导出当前比赛报告</button>
         <button id="jForceEndAll" class="btn danger">⏹ 一键交卷所有选手</button>
+        <button id="jManageCloudMatches" class="btn ghost">📋 云端比赛管理</button>
         <button class="btn ghost" data-view="home">返回首页</button>
       </div>
     </div>
@@ -212,6 +213,17 @@
       <div id="archivePlayerTable"></div>
     </div>
   </section>
+
+  <!-- 云端比赛管理弹窗 -->
+  <div id="cloudMatchesModal" class="modal hidden">
+    <div class="modal-content" style="max-width:900px">
+      <div class="modal-header">
+        <h2>📋 云端比赛管理</h2>
+        <button class="btn ghost small" id="cloudMatchesClose">✕ 关闭</button>
+      </div>
+      <div id="cloudMatchesBody"></div>
+    </div>
+  </div>
 
   <!-- 选手详情弹窗 -->
   <div id="playerModal" class="modal hidden">

@@ -427,6 +427,28 @@ const Judge = (() => {
     refreshPlayerList();
   }
 
+  async function resetPlayer(){
+    if(!currentDetailCode){ showToast('请先选择选手', 'err'); return; }
+    if(!confirm(`重置该选手进度？\n所有答题数据将被清除（邀请码可继续使用）。`)) return;
+    const m = Storage.getMatch();
+    if(!m) return;
+    const playerKey = m.roomId + '_' + currentDetailCode;
+    Storage.clearProgress(playerKey);
+    localStorage.removeItem('exam_result_' + playerKey);
+    const cd = m.codes.find(c => c.code === currentDetailCode);
+    if(cd){
+      cd.used = false;
+      cd.usedAt = null;
+      cd.playerName = null;
+      Storage.saveMatch(m);
+    }
+    Realtime.emit('judge:action', { type:'reset', key: playerKey });
+    showToast('已重置', 'ok');
+    hidePlayerDetail();
+    refreshPlayerList();
+    refreshMatchUI();
+  }
+
   async function createMatchQuick(){
     console.log('[createMatchQuick] 开始');
     const bank = Storage.getBank();
